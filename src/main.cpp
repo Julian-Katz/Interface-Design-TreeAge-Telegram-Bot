@@ -6,6 +6,21 @@
 #include <string.h>
 #include <ctype.h>
 
+// Measuring length
+long int rotValue=0, swValue=0;
+float rotations = 0;
+uint8_t state=0;
+
+#define ROTARY_PINA 32
+#define ROTARY_PINB 25
+#define ROTARY_PINSW 21
+
+#define ONE_ROTATION 74
+
+portMUX_TYPE gpioMux = portMUX_INITIALIZER_UNLOCKED;
+
+
+// Telegram Bot Data
 // Wifi network station credentials
 #define WIFI_SSID "x"
 #define WIFI_PASSWORD "x"
@@ -20,7 +35,6 @@ WiFiClientSecure secured_client;
 UniversalTelegramBot bot(BOT_TOKEN, secured_client);
 unsigned long bot_lasttime;          // last time messages' scan has been done
 
-// data
 const char* threes [4]  = { "Eiche", "Linde", "Eibe", "Kastanie" };
 const float threesFactor [4]  = { 0.8, 0.8, 0.7, 0.7 };
 
@@ -29,9 +43,43 @@ boolean choseMode = false;
 boolean manualMode = false;
 boolean espMode = false;
 int threeType;
-int threeDiameterCm = 0;
+float threeDiameterCm = 0;
 int threeAge = 0;
 
+// Measuring length 
+void IRAM_ATTR isrAB() {
+   uint8_t s = state & 3;
+
+  portENTER_CRITICAL_ISR(&gpioMux);
+    if (digitalRead(ROTARY_PINA)) s |= 4;
+    if (digitalRead(ROTARY_PINB)) s |= 8;
+    switch (s) {
+      case 0: case 5: case 10: case 15:
+        break;
+      case 1: case 7: case 8: case 14:
+        rotValue++; break;
+      case 2: case 4: case 11: case 13:
+        rotValue--; break;
+      case 3: case 12:
+        rotValue += 2; break;
+      default:
+        rotValue -= 2; break;
+    }
+    state = (s >> 2);
+   portEXIT_CRITICAL_ISR(&gpioMux);
+ 
+}
+
+void IRAM_ATTR isrSWAll() {
+
+ portENTER_CRITICAL_ISR(&gpioMux);
+ swValue++;
+ portEXIT_CRITICAL_ISR(&gpioMux);
+
+}
+
+
+// Telegram Bot
 boolean isValidNumber(String str){
   for(byte i=0;i<str.length();i++)
   {
@@ -56,11 +104,27 @@ void handleNewMessages(int numNewMessages)
       continue;
     }
 
+    if (espMode) {
+      if(text == "/bestätigen") {
+        threeAge = threeDiameterCm * threesFactor[threeType];
+        Serial.println(threeDiameterCm);
+        const String message = "Das Alter des Baumes beträgt ungefähr " + String(threeAge) + " Jahre.";
+        espMode = false;
+        bot.sendMessage(chat_id, message, "");
+      }
+      else
+      {
+      rotValue=0;
+      swValue=0;
+      }
+      
+    }
+
     if (manualMode)
     {
       if (isValidNumber(text))
       {
-        threeDiameterCm = text.toInt();
+        threeDiameterCm = text.toFloat();
         threeAge = threeDiameterCm * threesFactor[threeType];
         Serial.println(threeDiameterCm);
         const String message = "Das Alter des Baumes beträgt ungefähr " + String(threeAge) + " Jahre.";
@@ -68,7 +132,7 @@ void handleNewMessages(int numNewMessages)
       }
       else
       {
-        bot.sendMessage(chat_id, "Du musst eine Nummer eingeben", "");
+        bot.sendMessage(chat_id, "Du musst eine Nummer eingeben", ""); 
       }
       
     }
@@ -82,7 +146,7 @@ void handleNewMessages(int numNewMessages)
       {
         choseMode = false;
         espMode = true;
-        bot.sendMessage(chat_id, "/messenStarten Messe jetzt mit dem Gerät");
+        bot.sendMessage(chat_id, "Messe jetzt mit dem Gerät");
       } 
       else if (text == "/manuelleEingabe")
       {
@@ -130,6 +194,15 @@ void handleNewMessages(int numNewMessages)
 
 void setup()
 {
+  // Measuring length setup
+  pinMode(ROTARY_PINA, INPUT_PULLUP);
+  pinMode(ROTARY_PINB, INPUT_PULLUP);
+  pinMode(ROTARY_PINSW, INPUT_PULLUP);
+
+  attachInterrupt(ROTARY_PINA, isrAB, CHANGE);
+  attachInterrupt(ROTARY_PINB, isrAB, CHANGE);
+  attachInterrupt(ROTARY_PINSW, isrSWAll, CHANGE);
+
   Serial.begin(115200);
   Serial.println();
 
@@ -172,5 +245,19 @@ void loop()
     }
 
     bot_lasttime = millis();
+  }
+  if (espMode) {
+  Serial.print("isrSWAll ");
+  Serial.print(swValue);
+  Serial.print(" rotValue ");
+  Serial.println(rotValue);
+  rotations = (float) rotValue / ONE_ROTATION;
+  threeDiameterCm = rotations * 2 * 3.14 * 2.5;
+  Serial.println(rotations);
+  Serial.println(rotations * 2 * 3.14 * 2.5);
+  bot.sendMessage(CHAT_ID, String(threeDiameterCm) + "cm Umfang", "");
+  bot.sendMessage(CHAT_ID, "/bestätigen", "");
+  bot.sendMessage(CHAT_ID, "/zurücksetzten", "");
+  delay(100);
   }
 }
