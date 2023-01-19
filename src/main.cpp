@@ -35,8 +35,8 @@ WiFiClientSecure secured_client;
 UniversalTelegramBot bot(BOT_TOKEN, secured_client);
 unsigned long bot_lasttime;          // last time messages' scan has been done
 
-const char* threes [4]  = { "Eiche", "Linde", "Eibe", "Kastanie" };
-const float threesFactor [4]  = { 0.8, 0.8, 0.7, 0.7 };
+const char* trees [4]  = { "Eiche", "Linde", "Eibe", "Kastanie" };
+const float treesFactor [4]  = { 0.8, 0.8, 0.7, 0.7 };
 
 boolean started = false;
 boolean choseMode = false;
@@ -106,7 +106,7 @@ void handleNewMessages(int numNewMessages)
 
     if (espMode) {
       if(text == "/bestätigen") {
-        threeAge = threeDiameterCm * threesFactor[threeType];
+        threeAge = threeDiameterCm * treesFactor[threeType];
         Serial.println(threeDiameterCm);
         const String message = "Das Alter des Baumes beträgt ungefähr " + String(threeAge) + " Jahre.";
         espMode = false;
@@ -125,7 +125,7 @@ void handleNewMessages(int numNewMessages)
       if (isValidNumber(text))
       {
         threeDiameterCm = text.toFloat();
-        threeAge = threeDiameterCm * threesFactor[threeType];
+        threeAge = threeDiameterCm * treesFactor[threeType];
         Serial.println(threeDiameterCm);
         const String message = "Das Alter des Baumes beträgt ungefähr " + String(threeAge) + " Jahre.";
         bot.sendMessage(chat_id, message, "");
@@ -141,7 +141,7 @@ void handleNewMessages(int numNewMessages)
     if (choseMode)
     {
       Serial.println("step1");
-      Serial.print(threes[threeType]);
+      Serial.print(trees[threeType]);
       if(text == "/messenStarten")
       {
         choseMode = false;
@@ -162,7 +162,7 @@ void handleNewMessages(int numNewMessages)
       Serial.println("started");
       for (size_t i = 0; i < 4; i++)
       {
-        if (text == threes[i]) {
+        if (text == trees[i]) {
           threeType = i;
           bot.sendMessage(chat_id, "Um das Alter des Baumes zu bestimmen brauche ich den Durchmesser\nWähle zwischen:\n/messenStarten\n/manuelleEingabe");
           bot.sendMessage(chat_id, "Damit dein Ergebnis möglichst genau wird, messe den Durchmesser des Stamms in ca. 1m Höhe vom Boden aus.");
@@ -174,12 +174,12 @@ void handleNewMessages(int numNewMessages)
       }
       if (!choseMode && started)
       {
-        String threesString;
+        String treesString;
         for (size_t i = 0; i < 4; i++)
         {
-          threesString = threesString + "\n" + threes[i];
+          treesString = treesString + "\n" + trees[i];
         }
-      bot.sendMessage(chat_id, "Baumart nicht gefunden! Versuche es erneut. Folgende Baumarten unterstütze ich:" + threesString);
+      bot.sendMessage(chat_id, "Baumart nicht gefunden! Versuche es erneut. Folgende Baumarten unterstütze ich:" + treesString);
       }
     }
 
